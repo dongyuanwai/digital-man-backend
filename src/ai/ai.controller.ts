@@ -15,7 +15,8 @@ export class AiController {
   
   @Sse('chat/stream')
   streamChat(@Query('query') query: string): Observable<{ data: string }> {
-    return from(this.aiService.streamChain(query)).pipe(
+    let stream = this.aiService.runChainStream(query);
+    return from(stream).pipe(
       map((data) => ({ data }))
     );
   }
