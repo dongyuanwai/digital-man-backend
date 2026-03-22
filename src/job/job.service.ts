@@ -104,7 +104,7 @@ export class JobService implements OnApplicationBootstrap {
 
     async toggleJob(jobId: string, enabled?: boolean) {
         const job = await this.entityManager.findOne(Job, { where: { id: jobId } });
-        if (!job) throw new NotFoundException(`Job not found: ${jobId}`);
+        if (!job) throw new NotFoundException(`Job not found: ${jobId}`);
 
         const nextEnabled = enabled ?? !job.isEnabled;
         if (job.isEnabled !== nextEnabled) {
@@ -119,6 +119,62 @@ export class JobService implements OnApplicationBootstrap {
         }
 
         return job;
+    }
+
+    async updateJob(
+        jobId: string,
+        input: Partial<{
+            instruction?: string;
+            cron?: string;
+            everyMs?: number;
+            at?: Date;
+        }>,
+    ) {
+        const job = await this.entityManager.findOne(Job, { where: { id: jobId } });
+        if (!job) throw new NotFoundException(`Job not found: ${jobId}`);
+
+        const wasEnabled = job.isEnabled;
+
+        // 先停止旧的调度
+        if (wasEnabled) {
+            this.stopRuntime(job);
+        }
+
+        // 更新字段
+        if (input.instruction !== undefined) {
+            job.instruction = input.instruction;
+        }
+        if (job.type === 'cron' && input.cron !== undefined) {
+            job.cron = input.cron;
+        }
+        if (job.type === 'every' && input.everyMs !== undefined) {
+            job.everyMs = input.everyMs;
+        }
+        if (job.type === 'at' && input.at !== undefined) {
+            job.at = input.at;
+        }
+
+        const saved = await this.entityManager.save(Job, job);
+
+        // 重新启动调度
+        if (wasEnabled) {
+            await this.startRuntime(saved);
+        }
+
+        return saved;
+    }
+
+    async deleteJob(jobId: string) {
+        const job = await this.entityManager.findOne(Job, { where: { id: jobId } });
+        if (!job) throw new NotFoundException(`Job not found: ${jobId}`);
+
+        // 先停止调度
+        this.stopRuntime(job);
+
+        // 删除数据库记录
+        await this.entityManager.remove(Job, job);
+
+        return { id: jobId, deleted: true };
     }
 
     private async startRuntime(job: Job) {
@@ -210,8 +266,8 @@ export class JobService implements OnApplicationBootstrap {
     private createCronJob(job: Job) {
         const cronExpr = job.cron ?? '';
         return new CronJob(cronExpr, async () => {
-                this.logger.log(`run job ${job.id}, ${job.instruction}`);
-                await this.entityManager.update(Job, job.id, { lastRun: new Date() });
-            });
-        }
+            this.logger.log(`run job ${job.id}, ${job.instruction}`);
+            await this.entityManager.update(Job, job.id, { lastRun: new Date() });
+        });
+    }
 }

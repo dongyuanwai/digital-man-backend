@@ -12,6 +12,7 @@ import { UsersModule } from './users/users.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JobModule } from './job/job.module';
 import { Job } from './job/entities/job.entity';
+import { ToolModule } from './tool/tool.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { Job } from './job/entities/job.entity';
       logging: true,
       entities: [User, Job],
     }),
+    ToolModule,
   ],
   controllers: [AppController],
   providers: [AppService],

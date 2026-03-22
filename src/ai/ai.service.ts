@@ -24,6 +24,7 @@ export class AiService {
         @Inject('SEND_MAIL_TOOL') private readonly sendMailTool: any,
         @Inject('WEB_SEARCH_TOOL') private readonly webSearchTool: any,
         @Inject('DB_USERS_CRUD_TOOL') private readonly dbUsersCrudTool: any,
+        @Inject('TIME_NOW_TOOL') private readonly timeNowTool: any,
         @Inject('CRON_JOB_TOOL') private readonly cronJobTool: any,
     ) {
         const prompt = PromptTemplate.fromTemplate(
@@ -35,6 +36,7 @@ export class AiService {
             this.sendMailTool,
             this.webSearchTool,
             this.dbUsersCrudTool,
+            this.timeNowTool,
             this.cronJobTool,
         ]);
     }
@@ -81,6 +83,24 @@ export class AiService {
                             content: result,
                         }),
                     );
+                } else if (toolName === 'time_now') {
+                    const result = await this.timeNowTool.invoke(toolCall.args);
+                    messages.push(
+                        new ToolMessage({
+                            tool_call_id: toolCallId,
+                            name: toolName,
+                            content: result,
+                        }),
+                    );
+                } else if (toolName === 'cron_job') {
+                    const result = await this.cronJobTool.invoke(toolCall.args);
+                    messages.push(
+                        new ToolMessage({
+                            tool_call_id: toolCallId,
+                            name: toolName,
+                            content: result,
+                        }),
+                    );
                 }
             }
         }
@@ -92,10 +112,10 @@ export class AiService {
             yield chunk;
         }
     }
-    async *runChainStream(query: string): AsyncIterable<string> {
+    async *runChainStream(query: string): AsyncIterable<string> {
         const messages: BaseMessage[] = [
             new SystemMessage(
-                `你是一个通用任务助手，可以根据用户的目标规划步骤，并在需要时调用工具：\`query_user\` 查询或校验用户信息、\`send_mail\` 发送邮件、\`web_search\` 进行互联网搜索、\`db_users_crud\` 读写数据库 users 表、\`cron_job\` 创建和管理定时/周期任务（\`list\`/\`add\`/\`toggle\`），从而实现提醒、定期任务、数据同步等各种自动化需求。
+                `你是一个通用任务助手，可以根据用户的目标规划步骤，并在需要时调用工具：\`query_user\` 查询或校验用户信息、\`send_mail\` 发送邮件、\`web_search\` 进行互联网搜索、\`db_users_crud\` 读写数据库 users 表、\`time_now\` 获取当前时间、\`cron_job\` 创建和管理定时/周期任务（\`list\`/\`add\`/\`toggle\`），从而实现提醒、定期任务、数据同步等各种自动化需求。
 
                 定时任务类型选择规则（非常重要）：
                 - 用户说“X分钟/小时/天后”“在某个时间点”“到点提醒”（一次性）=> 用 \`cron_job\` + \`type=at\`（执行一次后自动停用），\`at\`=当前时间+X 或解析出的时间点
@@ -191,7 +211,15 @@ export class AiService {
                             content: result,
                         }),
                     );
-
+                } else if (toolName === 'time_now') {
+                    const result = await this.timeNowTool.invoke(toolCall.args);
+                    messages.push(
+                        new ToolMessage({
+                            tool_call_id: toolCallId,
+                            name: toolName,
+                            content: result,
+                        }),
+                    );
                 }
             }
         }
