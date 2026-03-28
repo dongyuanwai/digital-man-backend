@@ -13,11 +13,14 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { JobModule } from './job/job.module';
 import { Job } from './job/entities/job.entity';
 import { ToolModule } from './tool/tool.module';
-
+import { SpeechModule } from './speech/speech.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 @Module({
   imports: [
     AiModule,
     UsersModule,
+    ToolModule,
+    SpeechModule,
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
@@ -56,7 +59,9 @@ import { ToolModule } from './tool/tool.module';
       logging: true,
       entities: [User, Job],
     }),
-    ToolModule,
+    EventEmitterModule.forRoot({
+      maxListeners: 200,
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],

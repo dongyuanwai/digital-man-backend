@@ -12,7 +12,8 @@ import {
     ToolMessage,
     AIMessageChunk
 } from '@langchain/core/messages';
-
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AI_TTS_STREAM_EVENT, type AiTtsStreamEvent } from '../common/stream-events';
 
 @Injectable()
 export class AiService {
@@ -26,6 +27,7 @@ export class AiService {
         @Inject('DB_USERS_CRUD_TOOL') private readonly dbUsersCrudTool: any,
         @Inject('TIME_NOW_TOOL') private readonly timeNowTool: any,
         @Inject('CRON_JOB_TOOL') private readonly cronJobTool: any,
+        private readonly eventEmitter: EventEmitter2,
     ) {
         const prompt = PromptTemplate.fromTemplate(
             '请回答以下问题：\n\n{query}',
@@ -226,4 +228,37 @@ export class AiService {
             }
         }
     }
+
+
+    // 语音识别合成播放一体的流式接口
+    async *streamChainSpeech(query: string, ttsSessionId?: string): AsyncGenerator<string> {
+    try {
+      const stream = await this.chain.stream({ query });
+      for await (const chunk of stream) {
+        if (ttsSessionId) {
+          const event: AiTtsStreamEvent = {
+            type: 'chunk',
+            sessionId: ttsSessionId,
+            chunk,
+          };
+          this.eventEmitter.emit(AI_TTS_STREAM_EVENT, event);
+        }
+        yield chunk;
+      }
+      if (ttsSessionId) {
+        const endEvent: AiTtsStreamEvent = { type: 'end', sessionId: ttsSessionId };
+        this.eventEmitter.emit(AI_TTS_STREAM_EVENT, endEvent);
+      }
+    } catch (error) {
+      if (ttsSessionId) {
+        const errorEvent: AiTtsStreamEvent = {
+          type: 'error',
+          sessionId: ttsSessionId,
+          error: error instanceof Error ? error.message : String(error),
+        };
+        this.eventEmitter.emit(AI_TTS_STREAM_EVENT, errorEvent);
+      }
+      throw error;
+    }
+  }
 }
