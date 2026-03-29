@@ -45,8 +45,11 @@
       const statusEl = document.getElementById("status");
       const resultEl = document.getElementById("result");
 
+      // 媒体录制器实例
       let mediaRecorder = null;
+      // 录音数据块数组
       let chunks = [];
+      // 录音文件名
       const recordFilename = "record.ogg";
 
       function setStatus(text) {
@@ -55,31 +58,38 @@
 
       startBtn.addEventListener("click", async () => {
         try {
+          // 获取用户麦克风权限并创建媒体流
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           chunks = [];
+          // 优先使用 ogg/opus 格式，如果不支持则使用默认格式
           const preferredMimeType = "audio/ogg;codecs=opus";
           mediaRecorder = MediaRecorder.isTypeSupported(preferredMimeType)
             ? new MediaRecorder(stream, { mimeType: preferredMimeType })
             : new MediaRecorder(stream);
 
+          // 录音数据可用事件：将数据块添加到 chunks 数组
           mediaRecorder.ondataavailable = (event) => {
             if (event.data && event.data.size > 0) {
               chunks.push(event.data);
             }
           };
 
+          // 录音停止事件：处理录音数据并上传到 /speech/asr
           mediaRecorder.onstop = async () => {
             setStatus("录音结束，正在上传...");
             try {
+              // 将数据块合并为 Blob 对象
               const blob = new Blob(chunks, {
                 type: mediaRecorder.mimeType || "audio/webm",
               });
+              // 检查录音数据是否为空
               if (!blob.size) {
                 throw new Error("录音数据为空，请至少录制 1 秒再上传");
               }
+              // 创建 FormData 并添加录音文件到表单
               const formData = new FormData();
               formData.append("audio", blob, recordFilename);
-
+              // 发送 POST 请求到 /speech/asr
               const response = await fetch("/speech/asr", {
                 method: "POST",
                 body: formData,
@@ -101,6 +111,7 @@
             }
           };
 
+          // 开始录音（每 250ms 收集一次数据）
           mediaRecorder.start(250);
           setStatus("录音中...");
           startBtn.disabled = true;
